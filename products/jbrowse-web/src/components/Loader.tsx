@@ -30,9 +30,6 @@ const StartScreenErrorMessage = lazy(
 )
 
 const paramsToDelete = [
-  'loc',
-  'tracks',
-  'assembly',
   'password',
   'sessionTracks',
   'hubURL',

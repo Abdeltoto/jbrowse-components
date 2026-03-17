@@ -197,6 +197,19 @@ export function DockviewLayoutMixin() {
         activePanelId,
         ...rest
       } = snap as Omit<typeof snap, symbol>
+
+      // skip serializing dockview state when there is only a single panel
+      // with a single view, which is the most common case and can be
+      // reconstructed automatically
+      const panelEntries = Object.entries(panelViewAssignments ?? {})
+      const isSinglePanel =
+        panelEntries.length <= 1 &&
+        (panelEntries.length === 0 || panelEntries[0]![1].length <= 1)
+
+      if (isSinglePanel) {
+        return rest as typeof snap
+      }
+
       return {
         ...rest,
         ...(dockviewLayout !== undefined ? { dockviewLayout } : {}),

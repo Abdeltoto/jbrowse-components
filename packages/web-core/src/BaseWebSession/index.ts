@@ -527,5 +527,13 @@ export function BaseWebSession({
       // xref https://github.com/GMOD/jbrowse-components/issues/1903
       return !Array.isArray(connectionInstances) ? rest : snapshot
     },
+    postProcessor(snapshot) {
+      const { sessionPlugins, margin, ...rest } = snapshot
+      return {
+        ...rest,
+        ...(margin ? { margin } : {}),
+        ...(sessionPlugins?.length ? { sessionPlugins } : {}),
+      }
+    },
   })
 }

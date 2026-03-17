@@ -678,6 +678,17 @@ export default function stateTreeFactory(pluginManager: PluginManager) {
         )
       },
     }))
+    .postProcessSnapshot(snap => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!snap) {
+        return snap
+      }
+      const { faceted, ...rest } = snap as Omit<typeof snap, symbol>
+      return {
+        ...rest,
+        ...(faceted && Object.keys(faceted).length ? { faceted } : {}),
+      } as typeof snap
+    })
 }
 
 export type HierarchicalTrackSelectorStateModel = ReturnType<

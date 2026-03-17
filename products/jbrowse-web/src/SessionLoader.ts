@@ -544,7 +544,8 @@ const SessionLoader = types
      */
     async decodeJsonUrlSession() {
       // sessionQuery is guaranteed to exist when isJsonSession is true
-      const { session } = JSON.parse(self.sessionQuery!.replace(/^json-/, ''))
+      const parsed = JSON.parse(self.sessionQuery!.replace(/^json-/, ''))
+      const session = parsed.session ?? parsed
       await this.loadDecodedSession(session)
     },
     /**

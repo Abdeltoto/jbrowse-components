@@ -21,4 +21,12 @@ export function AppFocusMixin() {
         self.focusedViewId = viewId
       },
     }))
+    .postProcessSnapshot(snap => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!snap) {
+        return snap
+      }
+      const { focusedViewId: _, ...rest } = snap as Omit<typeof snap, symbol>
+      return rest as typeof snap
+    })
 }
