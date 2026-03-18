@@ -1,10 +1,17 @@
+import { lazy } from 'react'
+
 import { DisplayType } from '@jbrowse/core/pluggableElementTypes'
-import { BaseLinearDisplayComponent } from '@jbrowse/plugin-linear-genome-view'
 
 import { configSchemaFactory } from './configSchema.ts'
 import { stateModelFactory } from './model.ts'
 
 import type PluginManager from '@jbrowse/core/PluginManager'
+
+const LazyBaseLinearDisplayComponent = lazy(() =>
+  import('@jbrowse/plugin-linear-genome-view').then(m => ({
+    default: m.BaseLinearDisplayComponent,
+  })),
+)
 
 export default function LinearLollipopDisplayF(pluginManager: PluginManager) {
   pluginManager.addDisplayType(() => {
@@ -15,7 +22,7 @@ export default function LinearLollipopDisplayF(pluginManager: PluginManager) {
       stateModel: stateModelFactory(configSchema),
       trackType: 'LollipopTrack',
       viewType: 'LinearGenomeView',
-      ReactComponent: BaseLinearDisplayComponent,
+      ReactComponent: LazyBaseLinearDisplayComponent,
     })
   })
 }

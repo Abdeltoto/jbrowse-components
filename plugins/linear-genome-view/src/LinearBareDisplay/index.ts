@@ -1,10 +1,15 @@
+import { lazy } from 'react'
+
 import { DisplayType } from '@jbrowse/core/pluggableElementTypes'
 
 import { configSchemaFactory } from './configSchema.ts'
 import { stateModelFactory } from './model.ts'
-import { BaseLinearDisplayComponent } from '../BaseLinearDisplay//index.ts'
 
 import type PluginManager from '@jbrowse/core/PluginManager'
+
+const LazyBaseLinearDisplayComponent = lazy(
+  () => import('../BaseLinearDisplay/components/BaseLinearDisplay.tsx'),
+)
 
 export default function LinearBareDisplayF(pluginManager: PluginManager) {
   pluginManager.addDisplayType(() => {
@@ -16,7 +21,7 @@ export default function LinearBareDisplayF(pluginManager: PluginManager) {
       stateModel: stateModelFactory(configSchema),
       trackType: 'BasicTrack',
       viewType: 'LinearGenomeView',
-      ReactComponent: BaseLinearDisplayComponent,
+      ReactComponent: LazyBaseLinearDisplayComponent,
     })
   })
 }

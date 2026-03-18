@@ -6,18 +6,13 @@ import LineStyleIcon from '@mui/icons-material/LineStyle'
 
 import {
   BaseLinearDisplay,
-  BaseLinearDisplayComponent,
   baseLinearDisplayConfigSchema,
 } from './BaseLinearDisplay/index.ts'
 import BasicTrackF from './BasicTrack/index.ts'
 import FeatureTrackF from './FeatureTrack/index.ts'
 import LaunchLinearGenomeViewF from './LaunchLinearGenomeView/index.ts'
 import LinearBareDisplayF from './LinearBareDisplay/index.ts'
-import ZoomControls from './LinearGenomeView/components/HeaderZoomControls.tsx'
-import LinearGenomeViewF, {
-  LinearGenomeView,
-  SearchBox,
-} from './LinearGenomeView/index.ts'
+import LinearGenomeViewF from './LinearGenomeView/index.ts'
 
 import type PluginManager from '@jbrowse/core/PluginManager'
 import type { AbstractSessionModel } from '@jbrowse/core/util'
@@ -26,12 +21,8 @@ export default class LinearGenomeViewPlugin extends Plugin {
   name = 'LinearGenomeViewPlugin'
 
   exports = {
-    BaseLinearDisplayComponent,
     BaseLinearDisplay,
     baseLinearDisplayConfigSchema,
-    SearchBox,
-    ZoomControls,
-    LinearGenomeView,
   }
 
   /**
