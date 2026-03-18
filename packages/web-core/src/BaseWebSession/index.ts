@@ -36,7 +36,7 @@ import { WebSessionConnectionsMixin } from '../SessionConnections.ts'
 import type { Menu } from '@jbrowse/app-core'
 import type { PluginDefinition } from '@jbrowse/core/PluginLoader'
 import type PluginManager from '@jbrowse/core/PluginManager'
-import type TextSearchManager from '@jbrowse/core/TextSearch/TextSearchManager'
+import type LazyTextSearchManager from '@jbrowse/core/TextSearch/LazyTextSearchManager'
 import type { BaseAssemblyConfigSchema } from '@jbrowse/core/assemblyManager'
 import type {
   AnyConfiguration,
@@ -191,7 +191,7 @@ export function BaseWebSession({
       /**
        * #getter
        */
-      get textSearchManager(): TextSearchManager {
+      get textSearchManager(): LazyTextSearchManager {
         return self.root.textSearchManager
       },
       /**

@@ -255,10 +255,8 @@ export default function MultiRegionDisplayMixin() {
           )
 
           // Autorun: fetch data when the visible viewport isn't covered
-          // by loaded data. Uses mergedVisibleRegions (exact viewport) for
-          // the coverage check, and adds an explicit buffer when fetching
-          // so the loaded data extends beyond the viewport for smooth
-          // scrolling without blank gaps.
+          // by loaded data. Uses roundedVisibleRegions which includes a
+          // pre-fetch buffer for smooth scrolling without blank gaps.
           addDisposer(
             self,
             autorun(
@@ -280,32 +278,19 @@ export default function MultiRegionDisplayMixin() {
 
                 self.beforeFetchCheck()
 
-                const visibleMerged = view.mergedVisibleRegions
-                const bufferBp = view.width * view.bpPerPx * 0.5
                 const needed: { region: Region; regionNumber: number }[] = []
-                for (const vr of visibleMerged) {
+                for (const entry of view.roundedVisibleRegions) {
                   const loaded = untracked(() =>
-                    self.loadedRegions.get(vr.regionNumber),
+                    self.loadedRegions.get(entry.regionNumber),
                   )
                   const boundsValid =
-                    loaded?.refName === vr.refName &&
-                    vr.start >= loaded.start &&
-                    vr.end <= loaded.end
-                  if (boundsValid && self.isCacheValid(vr.regionNumber)) {
+                    loaded?.refName === entry.region.refName &&
+                    entry.region.start >= loaded.start &&
+                    entry.region.end <= loaded.end
+                  if (boundsValid && self.isCacheValid(entry.regionNumber)) {
                     continue
                   }
-                  const dr = view.displayedRegions[vr.regionNumber]
-                  if (dr) {
-                    needed.push({
-                      region: {
-                        refName: vr.refName,
-                        start: Math.max(dr.start, vr.start - bufferBp),
-                        end: Math.min(dr.end, vr.end + bufferBp),
-                        assemblyName: vr.assemblyName,
-                      },
-                      regionNumber: vr.regionNumber,
-                    })
-                  }
+                  needed.push(entry)
                 }
                 if (needed.length > 0) {
                   self.onFetchNeeded(needed)

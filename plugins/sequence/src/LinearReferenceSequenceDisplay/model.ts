@@ -203,18 +203,10 @@ export function modelFactory(configSchema: AnyConfigurationSchemaType) {
             if (!view.initialized || view.bpPerPx > 10) {
               return undefined
             }
-            const bufferBp = view.width * view.bpPerPx * 0.5
-            const regions = view.mergedVisibleRegions.map(vr => {
-              const dr = view.displayedRegions[vr.regionNumber]
-              return {
-                ...vr,
-                start: Math.max(dr?.start ?? 0, vr.start - bufferBp),
-                end: Math.min(dr?.end ?? vr.end, vr.end + bufferBp),
-              }
-            })
+            const entries = view.roundedVisibleRegions
             return {
               adapterConfig: self.adapterConfig,
-              regions,
+              entries,
               sessionId: getRpcSessionId(self),
             }
           },
@@ -223,10 +215,10 @@ export function modelFactory(configSchema: AnyConfigurationSchemaType) {
               return undefined
             }
             const { rpcManager } = getSession(self)
-            const { adapterConfig, regions, sessionId } = args
+            const { adapterConfig, entries, sessionId } = args
             const result = new Map<number, SequenceRegionData>()
 
-            for (const region of regions) {
+            for (const { region, regionNumber } of entries) {
               const rawFeatures = await rpcManager.call(
                 sessionId,
                 'CoreGetFeatures',
@@ -240,7 +232,7 @@ export function modelFactory(configSchema: AnyConfigurationSchemaType) {
               for (const f of features) {
                 const seq = f.get('seq') as string | undefined
                 if (seq) {
-                  result.set(region.regionNumber, {
+                  result.set(regionNumber, {
                     seq,
                     start: f.get('start'),
                     end: f.get('end'),

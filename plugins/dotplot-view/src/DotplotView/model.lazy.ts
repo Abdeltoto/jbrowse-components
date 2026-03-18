@@ -38,8 +38,8 @@ import {
   defaultTickSize,
 } from './model.ts'
 
-import type { DotplotViewInit, ImportFormSyntenyTrack } from './types.ts'
 import type { DotplotViewBaseModel, ExportSvgOptions } from './model.ts'
+import type { DotplotViewInit, ImportFormSyntenyTrack } from './types.ts'
 import type { AnyConfigurationModel } from '@jbrowse/core/configuration'
 import type { Base1DViewModel } from '@jbrowse/core/util/Base1DViewModel'
 import type { BaseBlock } from '@jbrowse/core/util/blockTypes'

@@ -11,12 +11,12 @@ import { autorun, observable, when } from 'mobx'
 
 import { Curves } from './components/Icons.tsx'
 
+import type { LinearSyntenyViewBaseModel } from './model.ts'
 import type {
   ExportSvgOptions,
   ImportFormSyntenyTrack,
   LinearSyntenyViewInit,
 } from './types.ts'
-import type { LinearSyntenyViewBaseModel } from './model.ts'
 import type { Instance } from '@jbrowse/mobx-state-tree'
 
 const ExportSvgDialog = lazy(() => import('./components/ExportSvgDialog.tsx'))

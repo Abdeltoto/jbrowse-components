@@ -1,7 +1,8 @@
+import type React from 'react'
+
 import { BaseViewModel } from '@jbrowse/core/pluggableElementTypes/models'
 import { lazyInit, types } from '@jbrowse/mobx-state-tree'
 
-import type React from 'react'
 import type { enhance } from './model.lazy.ts'
 import type PluginManager from '@jbrowse/core/PluginManager'
 import type { Region } from '@jbrowse/core/util/types'

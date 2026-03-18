@@ -7,6 +7,10 @@ import {
 } from '@jbrowse/plugin-linear-genome-view'
 
 import { ArcsSubModel } from './ArcsSubModel.ts'
+import {
+  LONG_INSERTION_MIN_LENGTH,
+  LONG_INSERTION_TEXT_THRESHOLD_PX,
+} from './constants.ts'
 
 import type { enhance } from './model.lazy.ts'
 import type { ColorBy, FilterBy, SortedBy } from '../shared/types'
@@ -19,10 +23,6 @@ export const YSCALEBAR_LABEL_OFFSET = 5
 // Insertion type classification - must match shader logic in WebGLRenderer.ts
 export type InsertionType = 'large' | 'long' | 'small'
 
-import {
-  LONG_INSERTION_MIN_LENGTH,
-  LONG_INSERTION_TEXT_THRESHOLD_PX,
-} from './constants.ts'
 
 /**
  * Classify an insertion based on its length and current zoom level.

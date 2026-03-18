@@ -2,7 +2,7 @@ import { lazy } from 'react'
 
 import ViewType from '@jbrowse/core/pluggableElementTypes/ViewType'
 
-import modelFactory from './model.ts'
+import { stateModelFactory } from './model.ts'
 
 import type PluginManager from '@jbrowse/core/PluginManager'
 
@@ -14,7 +14,7 @@ export default function LinearComparativeViewF(pluginManager: PluginManager) {
         hiddenFromGUI: true,
       },
       displayName: 'Linear comparative view',
-      stateModel: modelFactory(pluginManager),
+      stateModel: stateModelFactory(pluginManager),
       ReactComponent: lazy(
         () => import('./components/LinearComparativeView.tsx'),
       ),

@@ -18,7 +18,6 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
 import { autorun } from 'mobx'
 
-import { calculateStaticSlices, sliceIsVisible } from './slices.ts'
 import {
   defaultBpPerPx,
   defaultHeight,
@@ -30,14 +29,15 @@ import {
   defaultPaddingPx,
   defaultSpacingPx,
 } from './model.ts'
+import { calculateStaticSlices, sliceIsVisible } from './slices.ts'
 import { viewportVisibleSection } from './viewportVisibleRegion.ts'
 
-import type { SliceRegion } from './slices.ts'
 import type {
   CircularViewBaseModel,
   CircularViewInit,
   ExportSvgOptions,
 } from './model.ts'
+import type { SliceRegion } from './slices.ts'
 import type { AnyConfigurationModel } from '@jbrowse/core/configuration'
 import type { MenuItem } from '@jbrowse/core/ui'
 import type { Region } from '@jbrowse/core/util/types'

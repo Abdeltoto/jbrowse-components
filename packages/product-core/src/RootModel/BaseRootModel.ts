@@ -1,4 +1,4 @@
-import TextSearchManager from '@jbrowse/core/TextSearch/TextSearchManager'
+import LazyTextSearchManager from '@jbrowse/core/TextSearch/LazyTextSearchManager'
 import assemblyManagerFactory from '@jbrowse/core/assemblyManager'
 import RpcManager from '@jbrowse/core/rpc/RpcManager'
 import {
@@ -79,7 +79,7 @@ export function BaseRootModelFactory({
       /**
        * #volatile
        */
-      textSearchManager: new TextSearchManager(pluginManager),
+      textSearchManager: new LazyTextSearchManager(pluginManager),
       /**
        * #volatile
        */

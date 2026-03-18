@@ -11,7 +11,7 @@ import type {
   Region as MUIRegion,
   UriLocation as MUUriLocation,
 } from './mst.ts'
-import type TextSearchManager from '../../TextSearch/TextSearchManager.ts'
+import type LazyTextSearchManager from '../../TextSearch/LazyTextSearchManager.ts'
 import type assemblyManager from '../../assemblyManager/index.ts'
 import type { AnyConfigurationModel } from '../../configuration/index.ts'
 import type { BaseInternetAccountModel } from '../../pluggableElementTypes/models/index.ts'
@@ -124,7 +124,7 @@ export interface AbstractSessionModel extends AbstractViewContainer {
   getTrackListMenuItems?: (arg: AnyConfigurationModel) => MenuItem[]
   addAssembly?: Function
   removeAssembly?: Function
-  textSearchManager?: TextSearchManager
+  textSearchManager?: LazyTextSearchManager
   connections: AnyConfigurationModel[]
   deleteConnection?: Function
   temporaryAssemblies?: unknown[]
@@ -576,4 +576,4 @@ export type PreFileLocation =
   | PreBlobLocation
   | PreFileHandleLocation
 
-export { default as TextSearchManager } from '../../TextSearch/TextSearchManager.ts'
+export type { default as TextSearchManager } from '../../TextSearch/LazyTextSearchManager.ts'

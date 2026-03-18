@@ -53,6 +53,7 @@ import {
   parseLocStrings,
 } from './util.ts'
 
+import type { LinearGenomeViewBaseModel } from './model.ts'
 import type {
   BpOffset,
   ExportSvgOptions,
@@ -61,7 +62,6 @@ import type {
   NavLocation,
   VolatileGuide,
 } from './types.ts'
-import type { LinearGenomeViewBaseModel } from './model.ts'
 import type BaseResult from '@jbrowse/core/TextSearch/BaseResults'
 import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import type { MenuItem } from '@jbrowse/core/ui'

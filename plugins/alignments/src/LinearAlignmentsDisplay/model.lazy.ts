@@ -49,7 +49,6 @@ import {
 import { openCigarWidget } from './components/openFeatureWidget.ts'
 import { ColorScheme, YSCALEBAR_LABEL_OFFSET } from './model.ts'
 
-import type { LinearAlignmentsDisplayBaseModel, Region } from './model.ts'
 import type {
   AlignmentsRenderer,
   ColorPalette,
@@ -60,6 +59,7 @@ import type {
   CigarHitResult,
   IndicatorHitResult,
 } from './components/hitTesting.ts'
+import type { LinearAlignmentsDisplayBaseModel, Region } from './model.ts'
 import type { PileupDataResult } from '../RenderPileupDataRPC/types'
 import type { LegendItem } from '../shared/legendUtils.ts'
 import type { ColorBy, FilterBy, SortedBy } from '../shared/types'
@@ -1396,6 +1396,7 @@ export function enhance(base: LinearAlignmentsDisplayBaseModel) {
               if (r.result.newTagValues) {
                 if (self.updateColorTagMap(r.result.newTagValues)) {
                   newTagColorsAdded = true
+                  // eslint-disable-next-line no-console
                   console.log(
                     '[alignments] new tag colors discovered:',
                     r.result.newTagValues,
@@ -1427,6 +1428,7 @@ export function enhance(base: LinearAlignmentsDisplayBaseModel) {
               computeAndSetArcs(needed)
             }
             if (newTagColorsAdded && self.colorBy.type === 'tag') {
+              // eslint-disable-next-line no-console
               console.log(
                 '[alignments] re-fetching with populated colorTagMap:',
                 { ...self.colorTagMap },
@@ -1661,11 +1663,7 @@ export function enhance(base: LinearAlignmentsDisplayBaseModel) {
                 prevArcColorByType = colorByType
                 if (self.showArcs && self.rpcDataMap.size > 0) {
                   const view = getContainingView(self) as LGV
-                  const regions = view.mergedVisibleRegions.map(vr => ({
-                    region: vr as Region,
-                    regionNumber: vr.regionNumber,
-                  }))
-                  computeAndSetArcs(regions)
+                  computeAndSetArcs(view.roundedVisibleRegions)
                 }
               },
               { name: 'LinearAlignmentsDisplay:recomputeArcColors' },
