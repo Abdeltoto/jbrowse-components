@@ -187,12 +187,3 @@ export function stateModelFactory(pluginManager: PluginManager) {
 export type LinearGenomeViewStateModel = ReturnType<typeof stateModelFactory>
 export type LinearGenomeViewModel = Instance<LinearGenomeViewStateModel>
 
-export {
-  default as LinearGenomeView,
-  default as ReactComponent,
-} from './components/LinearGenomeView.tsx'
-
-export { default as RefNameAutocomplete } from './components/RefNameAutocomplete/index.tsx'
-export { default as SearchBox } from './components/SearchBox.tsx'
-
-export { renderToSvg } from './svgcomponents/SVGLinearGenomeView.tsx'
