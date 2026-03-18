@@ -1,0 +1,452 @@
+import { lazy } from 'react'
+
+import { getSession } from '@jbrowse/core/util'
+import { addDisposer } from '@jbrowse/mobx-state-tree'
+import CropFreeIcon from '@mui/icons-material/CropFree'
+import LinkIcon from '@mui/icons-material/Link'
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
+import ShuffleIcon from '@mui/icons-material/Shuffle'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import { autorun, observable, when } from 'mobx'
+
+import { Curves } from './components/Icons.tsx'
+
+import type {
+  ExportSvgOptions,
+  ImportFormSyntenyTrack,
+  LinearSyntenyViewInit,
+} from './types.ts'
+import type { LinearSyntenyViewBaseModel } from './model.ts'
+import type { Instance } from '@jbrowse/mobx-state-tree'
+
+const ExportSvgDialog = lazy(() => import('./components/ExportSvgDialog.tsx'))
+const DiagonalizationProgressDialog = lazy(
+  () => import('./components/DiagonalizationProgressDialog.tsx'),
+)
+
+type LinearSyntenyViewModel = Instance<ReturnType<typeof enhance>>
+
+export function enhance(base: LinearSyntenyViewBaseModel) {
+  return base
+    .volatile(() => ({
+      /**
+       * #volatile
+       */
+      importFormSyntenyTrackSelections:
+        observable.array<ImportFormSyntenyTrack>(),
+    }))
+    .views(self => ({
+      /**
+       * #getter
+       */
+      get hasSomethingToShow() {
+        return self.views.length > 0 || !!self.init
+      },
+      /**
+       * #getter
+       */
+      get drawCIGAR() {
+        return self.cigarMode !== 'off'
+      },
+      /**
+       * #getter
+       */
+      get drawCIGARMatchesOnly() {
+        return self.cigarMode === 'matches'
+      },
+    }))
+    .views(self => ({
+      /**
+       * #getter
+       * Whether to show a loading indicator instead of the import form or view
+       */
+      get showLoading() {
+        return self.isLoading || (!self.initialized && self.hasSomethingToShow)
+      },
+      /**
+       * #getter
+       * Whether to show the import form
+       */
+      get showImportForm() {
+        return !self.hasSomethingToShow
+      },
+    }))
+    .actions(self => ({
+      /**
+       * #action
+       */
+      importFormRemoveRow(idx: number) {
+        self.importFormSyntenyTrackSelections.splice(idx, 1)
+      },
+      /**
+       * #action
+       */
+      clearImportFormSyntenyTracks() {
+        self.importFormSyntenyTrackSelections.clear()
+      },
+      /**
+       * #action
+       */
+      setImportFormSyntenyTrack(arg: number, val: ImportFormSyntenyTrack) {
+        self.importFormSyntenyTrackSelections[arg] = val
+      },
+      /**
+       * #action
+       */
+      setDrawCurves(arg: boolean) {
+        self.drawCurves = arg
+      },
+      /**
+       * #action
+       */
+      setCigarMode(arg: 'off' | 'matches' | 'full') {
+        self.cigarMode = arg
+      },
+      /**
+       * #action
+       */
+      setDrawLocationMarkers(arg: boolean) {
+        self.drawLocationMarkers = arg
+      },
+      /**
+       * #action
+       */
+      setMaxOffScreenDrawPx(arg: number) {
+        self.maxOffScreenDrawPx = arg
+      },
+      /**
+       * #action
+       */
+      showAllRegions() {
+        for (const view of self.views) {
+          view.showAllRegionsInAssembly()
+        }
+      },
+      /**
+       * #action
+       */
+      setInit(init?: LinearSyntenyViewInit) {
+        self.init = init
+      },
+    }))
+    .actions(self => ({
+      /**
+       * #action
+       */
+      async exportSvg(opts: ExportSvgOptions) {
+        const { renderToSvg } =
+          await import('./svgcomponents/SVGLinearSyntenyView.tsx')
+        const html = await renderToSvg(self as LinearSyntenyViewModel, opts)
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        const { saveAs } = await import('file-saver-es')
+
+        if (opts.format === 'png') {
+          const img = new Image()
+          const svgBlob = new Blob([html], { type: 'image/svg+xml' })
+          const url = URL.createObjectURL(svgBlob)
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img.width
+              canvas.height = img.height
+              const ctx = canvas.getContext('2d')!
+              ctx.drawImage(img, 0, 0)
+              URL.revokeObjectURL(url)
+              canvas.toBlob(blob => {
+                if (blob) {
+                  saveAs(blob, opts.filename || 'image.png')
+                  resolve()
+                } else {
+                  reject(
+                    new Error(
+                      `Failed to create PNG. The image may be too large (${img.width}x${img.height}). Try reducing the view size or use SVG format.`,
+                    ),
+                  )
+                }
+              }, 'image/png')
+            }
+            img.onerror = () => {
+              URL.revokeObjectURL(url)
+              reject(new Error('Failed to load SVG for PNG conversion'))
+            }
+            img.src = url
+          })
+        } else {
+          saveAs(
+            new Blob([html], { type: 'image/svg+xml' }),
+            opts.filename || 'image.svg',
+          )
+        }
+      },
+    }))
+    .views(self => {
+      const superHeaderMenuItems = self.headerMenuItems
+      const superShowMenuItems = self.showMenuItems
+      const superMenuItems = self.menuItems
+      return {
+        /**
+         * #method
+         */
+        showMenuItems() {
+          return [
+            ...superShowMenuItems(),
+            {
+              label: 'Show all regions',
+              onClick: self.showAllRegions,
+              description: 'Show entire genome assemblies',
+              icon: VisibilityIcon,
+              helpText:
+                'This command will zoom out all views to display the entire genome assemblies. This is useful when you want to get a high-level overview of syntenic relationships across whole genomes or when you need to reset the view after zooming into specific regions.',
+            },
+            {
+              label: 'Show dynamic controls',
+              type: 'checkbox',
+              checked: self.showDynamicControls,
+              onClick: () => {
+                self.setShowDynamicControls(!self.showDynamicControls)
+              },
+              helpText:
+                'Toggle visibility of dynamic controls like opacity and minimum length sliders. These controls allow you to adjust synteny visualization parameters in real-time.',
+            },
+            {
+              label: 'CIGAR display mode',
+              subMenu: [
+                {
+                  label: 'Colorize indels',
+                  type: 'radio',
+                  checked: self.cigarMode === 'full',
+                  onClick: () => {
+                    self.setCigarMode('full')
+                  },
+                },
+                {
+                  label: "Don't colorize indels",
+                  type: 'radio',
+                  checked: self.cigarMode === 'matches',
+                  onClick: () => {
+                    self.setCigarMode('matches')
+                  },
+                },
+                {
+                  label: "Don't draw CIGAR",
+                  type: 'radio',
+                  checked: self.cigarMode === 'off',
+                  onClick: () => {
+                    self.setCigarMode('off')
+                  },
+                },
+              ],
+            },
+            {
+              label: 'Show curved lines',
+              type: 'checkbox',
+              checked: self.drawCurves,
+              icon: Curves,
+              onClick: () => {
+                self.setDrawCurves(!self.drawCurves)
+              },
+              helpText:
+                'Toggle between straight lines and smooth bezier curves for synteny connections. Curved lines can make the visualization more aesthetically pleasing and may help reduce visual clutter when many syntenic regions are displayed. Straight lines provide a more direct representation.',
+            },
+            {
+              label: 'Show location markers',
+              type: 'checkbox',
+              checked: self.drawLocationMarkers,
+              description:
+                'Draw periodic markers to show location within large matches',
+              onClick: () => {
+                self.setDrawLocationMarkers(!self.drawLocationMarkers)
+              },
+              helpText:
+                'Location markers add periodic visual indicators along long syntenic blocks, helping you track position and scale within large conserved regions. This is particularly useful when examining very long syntenic matches where it can be difficult to gauge relative position.',
+            },
+          ]
+        },
+        /**
+         * #method
+         * includes a subset of view menu options because the full list is a
+         * little overwhelming
+         */
+        headerMenuItems() {
+          return [
+            ...superHeaderMenuItems(),
+            {
+              label: 'Square view',
+              onClick: self.squareView,
+              description:
+                'Makes both views use the same zoom level, adjusting to the average of each',
+              icon: CropFreeIcon,
+              helpText:
+                'Square view synchronizes the zoom levels of both genome views by calculating the average zoom level and applying it to both panels. This helps ensure features are displayed at comparable scales, making it easier to compare syntenic regions visually.',
+            },
+            {
+              label: 'Re-order chromosomes',
+              onClick: () => {
+                getSession(self).queueDialog(handleClose => [
+                  DiagonalizationProgressDialog,
+                  {
+                    handleClose,
+                    model: self,
+                  },
+                ])
+              },
+              icon: ShuffleIcon,
+              description:
+                "Reorder and reorient query regions to minimize crossing lines, also known as 'diagonalizing'",
+              helpText:
+                "This operation 'diagonalizes' the data which algorithmically reorders and reorients chromosomes to minimize crossing synteny lines, creating a more diagonal pattern. This makes it easier to identify large-scale genomic rearrangements, inversions, and translocations. The process may take a few moments for large genomes.",
+            },
+            {
+              label: 'Link views',
+              type: 'checkbox',
+              checked: self.linkViews,
+              icon: LinkIcon,
+              onClick: () => {
+                self.setLinkViews(!self.linkViews)
+              },
+              helpText:
+                'When linked, panning and zooming in one genome view will automatically adjust the other view to maintain the correspondence shown by synteny lines. This makes it easier to explore syntenic regions interactively. Unlink views to navigate each genome independently.',
+            },
+            {
+              label: 'Export SVG',
+              icon: PhotoCameraIcon,
+              onClick: (): void => {
+                getSession(self).queueDialog(handleClose => [
+                  ExportSvgDialog,
+                  {
+                    model: self,
+                    handleClose,
+                  },
+                ])
+              },
+            },
+          ]
+        },
+        /**
+         * #method
+         */
+        menuItems() {
+          return [
+            ...superMenuItems(),
+            {
+              label: 'Export SVG',
+              icon: PhotoCameraIcon,
+              onClick: () => {
+                getSession(self).queueDialog(handleClose => [
+                  ExportSvgDialog,
+                  {
+                    model: self,
+                    handleClose,
+                  },
+                ])
+              },
+            },
+          ]
+        },
+      }
+    })
+    .actions(self => ({
+      afterAttach() {
+        addDisposer(
+          self,
+          autorun(
+            async function initAutorun() {
+              const { init, width } = self
+              if (!width || !init) {
+                return
+              }
+
+              const session = getSession(self)
+              const { assemblyManager } = session
+
+              try {
+                const assemblies = await Promise.all(
+                  init.views.map(async v => {
+                    const asm = await assemblyManager.waitForAssembly(
+                      v.assembly,
+                    )
+                    if (!asm) {
+                      throw new Error(`Assembly ${v.assembly} failed to load`)
+                    }
+                    return asm
+                  }),
+                )
+
+                self.setViews(
+                  assemblies.map(asm => ({
+                    type: 'LinearGenomeView' as const,
+                    bpPerPx: 1,
+                    offsetPx: 0,
+                    hideHeader: true,
+                    displayedRegions: asm.regions,
+                  })),
+                )
+
+                await Promise.all(
+                  self.views.map(view => when(() => view.initialized)),
+                )
+
+                await Promise.all(
+                  init.views.map(async (viewInit, idx) => {
+                    const view = self.views[idx]
+                    if (!view) {
+                      return
+                    }
+                    if (viewInit.loc) {
+                      await view.navToLocString(viewInit.loc, viewInit.assembly)
+                    } else {
+                      view.showAllRegionsInAssembly(viewInit.assembly)
+                    }
+                    if (viewInit.tracks) {
+                      for (const trackId of viewInit.tracks) {
+                        view.showTrack(trackId)
+                      }
+                    }
+                  }),
+                )
+
+                if (init.tracks && init.tracks.length > 0) {
+                  const perLevel = Array.isArray(init.tracks[0])
+                    ? (init.tracks as string[][])
+                    : [init.tracks as string[]]
+                  for (const [level, levelTracks] of perLevel.entries()) {
+                    for (const trackId of levelTracks) {
+                      self.showTrack(trackId, level)
+                    }
+                  }
+                }
+
+                self.setInit(undefined)
+              } catch (e) {
+                console.error(e)
+                session.notifyError(`${e}`, e)
+                self.setInit(undefined)
+              }
+            },
+            { name: 'LinearSyntenyViewInit' },
+          ),
+        )
+      },
+    }))
+    .postProcessSnapshot(snap => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!snap) {
+        return snap
+      }
+      const {
+        init,
+        cigarMode,
+        drawCurves,
+        drawLocationMarkers,
+        maxOffScreenDrawPx,
+        ...rest
+      } = snap as Omit<typeof snap, symbol>
+      return {
+        ...rest,
+        ...(cigarMode !== 'full' ? { cigarMode } : {}),
+        ...(drawCurves ? { drawCurves } : {}),
+        ...(drawLocationMarkers ? { drawLocationMarkers } : {}),
+        ...(maxOffScreenDrawPx !== 300 ? { maxOffScreenDrawPx } : {}),
+      } as typeof snap
+    })
+}

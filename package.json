@@ -145,5 +145,10 @@
     "webpack-cli": "^7.0.2",
     "webpack-dev-server": "^5.2.3"
   },
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "pnpm": {
+    "overrides": {
+      "@jbrowse/mobx-state-tree": "link:/home/cdiesh/src/mobx-state-tree"
+    }
+  }
 }

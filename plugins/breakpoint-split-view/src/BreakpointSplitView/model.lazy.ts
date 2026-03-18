@@ -1,0 +1,479 @@
+import { lazy } from 'react'
+
+import { getSession, notEmpty } from '@jbrowse/core/util'
+import {
+  addDisposer,
+  addMiddleware,
+  cast,
+  getPath,
+} from '@jbrowse/mobx-state-tree'
+import LinkIcon from '@mui/icons-material/Link'
+import PhotoCamera from '@mui/icons-material/PhotoCamera'
+import { autorun } from 'mobx'
+
+import { calc, getBlockFeatures, intersect } from './util.ts'
+
+import type { BreakpointSplitViewBaseModel } from './model.ts'
+import type { BreakpointSplitViewInit, ExportSvgOptions } from './types.ts'
+import type { Feature } from '@jbrowse/core/util'
+import type { Instance } from '@jbrowse/mobx-state-tree'
+
+const ExportSvgDialog = lazy(() => import('./components/ExportSvgDialog.tsx'))
+
+export type BreakpointViewModel = Instance<ReturnType<typeof enhance>>
+
+export function enhance(base: BreakpointSplitViewBaseModel) {
+  return base
+    .volatile(() => ({
+      /**
+       * #volatile
+       */
+      width: 800,
+      /**
+       * #volatile
+       */
+      matchedTrackFeatures: {} as Record<string, Feature[][]>,
+    }))
+    .views(self => ({
+      /**
+       * #getter
+       */
+      get hasSomethingToShow() {
+        return self.views.length > 0 || !!self.init
+      },
+
+      /**
+       * #getter
+       */
+      get initialized() {
+        return self.views.length > 0 && self.views.every(v => v.initialized)
+      },
+
+      /**
+       * #getter
+       */
+      get showImportForm() {
+        return !this.hasSomethingToShow
+      },
+    }))
+    .views(self => ({
+      /**
+       * #method
+       * creates an svg export and save using FileSaver
+       */
+      async exportSvg(opts: ExportSvgOptions = {}) {
+        const { renderToSvg } =
+          await import('./svgcomponents/SVGBreakpointSplitView.tsx')
+        const html = await renderToSvg(self as BreakpointViewModel, opts)
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        const { saveAs } = await import('file-saver-es')
+
+        if (opts.format === 'png') {
+          const img = new Image()
+          const svgBlob = new Blob([html], { type: 'image/svg+xml' })
+          const url = URL.createObjectURL(svgBlob)
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img.width
+              canvas.height = img.height
+              const ctx = canvas.getContext('2d')!
+              ctx.drawImage(img, 0, 0)
+              URL.revokeObjectURL(url)
+              canvas.toBlob(blob => {
+                if (blob) {
+                  saveAs(blob, opts.filename || 'image.png')
+                  resolve()
+                } else {
+                  reject(
+                    new Error(
+                      `Failed to create PNG. The image may be too large (${img.width}x${img.height}). Try reducing the view size or use SVG format.`,
+                    ),
+                  )
+                }
+              }, 'image/png')
+            }
+            img.onerror = () => {
+              URL.revokeObjectURL(url)
+              reject(new Error('Failed to load SVG for PNG conversion'))
+            }
+            img.src = url
+          })
+        } else {
+          saveAs(
+            new Blob([html], { type: 'image/svg+xml' }),
+            opts.filename || 'image.svg',
+          )
+        }
+      },
+    }))
+    .views(self => ({
+      /**
+       * #getter
+       * Find all track ids that match across multiple views, or return just
+       * the single view's track if only a single row is used
+       */
+      get matchedTracks() {
+        return self.views.length === 1
+          ? self.views[0]!.tracks
+          : intersect(
+              elt => elt.configuration.trackId,
+              ...self.views.map(
+                view => view.tracks as { configuration: { trackId: string } }[],
+              ),
+            )
+      },
+
+      /**
+       * #method
+       * Get tracks with a given trackId across multiple views
+       */
+      getMatchedTracks(trackConfigId: string) {
+        return self.views
+          .map(view => view.getTrack(trackConfigId))
+          .filter(notEmpty)
+      },
+
+      /**
+       * #method
+       * Translocation features are handled differently since they do not have
+       * a mate e.g. they are one sided
+       */
+      hasTranslocations(trackConfigId: string) {
+        return [...this.getTrackFeatures(trackConfigId).values()].some(
+          f => f.get('type') === 'translocation',
+        )
+      },
+
+      /**
+       * #method
+       * Paired features similar to breakends, but simpler, like BEDPE
+       */
+      hasPairedFeatures(trackConfigId: string) {
+        return [...this.getTrackFeatures(trackConfigId).values()].some(
+          f => f.get('type') === 'paired_feature',
+        )
+      },
+
+      /**
+       * #method
+       * Get a composite map of featureId-\>feature map for a track across
+       * multiple views
+       */
+      getTrackFeatures(trackConfigId: string) {
+        return new Map(
+          self.matchedTrackFeatures[trackConfigId]
+            ?.flat()
+            .map(f => [f.id(), f] as const),
+        )
+      },
+
+      /**
+       * #method
+       */
+      getMatchedFeaturesInLayout(trackConfigId: string, features: Feature[][]) {
+        const tracks = this.getMatchedTracks(trackConfigId)
+        return features.map(c =>
+          c
+            .map(feature => {
+              for (const [level, track] of tracks.entries()) {
+                const layout = calc(track, feature)
+                if (layout) {
+                  return {
+                    feature,
+                    layout,
+                    level,
+                    clipLengthAtStartOfRead:
+                      feature.get('clipLengthAtStartOfRead') ?? 0,
+                  }
+                }
+              }
+              return undefined
+            })
+            .filter(notEmpty),
+        )
+      },
+    }))
+    .actions(self => ({
+      afterAttach() {
+        addDisposer(
+          self,
+          addMiddleware(self, (rawCall, next) => {
+            if (rawCall.type === 'action' && rawCall.id === rawCall.rootId) {
+              const syncActions = [
+                'horizontalScroll',
+                'zoomTo',
+                'showTrack',
+                'toggleTrack',
+                'hideTrack',
+                'setTrackLabels',
+                'toggleCenterLine',
+              ]
+
+              if (self.linkViews && syncActions.includes(rawCall.name)) {
+                const sourcePath = getPath(rawCall.context)
+                next(rawCall)
+                // Sync to all other views
+                for (const view of self.views) {
+                  const viewPath = getPath(view)
+                  if (viewPath !== sourcePath) {
+                    // @ts-expect-error
+                    view[rawCall.name](rawCall.args[0])
+                  }
+                }
+                return
+              }
+            }
+            next(rawCall)
+          }),
+        )
+      },
+
+      /**
+       * #action
+       */
+      setWidth(newWidth: number) {
+        self.width = newWidth
+        for (const v of self.views) {
+          v.setWidth(newWidth)
+        }
+      },
+
+      /**
+       * #action
+       */
+      setInteractiveOverlay(arg: boolean) {
+        self.interactiveOverlay = arg
+      },
+
+      /**
+       * #action
+       */
+      setShowIntraviewLinks(arg: boolean) {
+        self.showIntraviewLinks = arg
+      },
+
+      /**
+       * #action
+       */
+      setLinkViews(arg: boolean) {
+        self.linkViews = arg
+      },
+
+      /**
+       * #action
+       */
+      setShowHeader(arg: boolean) {
+        self.showHeader = arg
+      },
+
+      /**
+       * #action
+       */
+      setMatchedTrackFeatures(obj: Record<string, Feature[][]>) {
+        self.matchedTrackFeatures = obj
+      },
+      /**
+       * #action
+       */
+      reverseViewOrder() {
+        self.views.reverse()
+      },
+
+      /**
+       * #action
+       */
+      setInit(init?: BreakpointSplitViewInit) {
+        self.init = init
+      },
+
+      /**
+       * #action
+       */
+      setViews(
+        viewInits: {
+          loc?: string
+          assembly: string
+          tracks?: string[]
+        }[],
+      ) {
+        self.views = cast(
+          viewInits.map(viewInit => ({
+            type: 'LinearGenomeView' as const,
+            hideHeader: true,
+            init: viewInit,
+          })),
+        )
+      },
+    }))
+    .actions(self => ({
+      afterAttach() {
+        addDisposer(
+          self,
+          autorun(
+            function breakpointSplitViewInitAutorun() {
+              const { init, width } = self
+              if (!width || !init) {
+                return
+              }
+
+              self.setViews(init.views)
+              self.setInit(undefined)
+            },
+            { name: 'BreakpointSplitViewInit' },
+          ),
+        )
+        addDisposer(
+          self,
+          autorun(
+            async () => {
+              try {
+                if (!self.views.every(view => view.initialized)) {
+                  return
+                }
+                if (
+                  self.matchedTracks.some(track => {
+                    const display = track.displays[0]
+                    return display.notReady?.() || display.regionTooLarge
+                  })
+                ) {
+                  return
+                }
+
+                self.setMatchedTrackFeatures(
+                  Object.fromEntries(
+                    await Promise.all(
+                      self.matchedTracks.map(async track => [
+                        track.configuration.trackId,
+                        await getBlockFeatures(self, track),
+                      ]),
+                    ),
+                  ),
+                )
+              } catch (e) {
+                console.error(e)
+                getSession(self).notifyError(`${e}`, e)
+              }
+            },
+            {
+              name: 'BreakpointFeatureFetcher',
+              delay: 1000,
+            },
+          ),
+        )
+      },
+
+      /**
+       * #method
+       */
+      menuItems() {
+        return [
+          ...self.views.map((view, idx) => ({
+            label: `Row ${idx + 1} view menu`,
+            subMenu: view.menuItems(),
+          })),
+
+          ...(self.views.length > 1
+            ? [
+                {
+                  label: 'Reverse view order',
+                  onClick: () => {
+                    self.reverseViewOrder()
+                  },
+                },
+              ]
+            : []),
+          {
+            label: 'Show header',
+            type: 'checkbox',
+            checked: self.showHeader,
+            onClick: () => {
+              self.setShowHeader(!self.showHeader)
+            },
+          },
+          {
+            label: 'Show intra-view links',
+            type: 'checkbox',
+            checked: self.showIntraviewLinks,
+            onClick: () => {
+              self.setShowIntraviewLinks(!self.showIntraviewLinks)
+            },
+          },
+          {
+            label: 'Allow clicking alignment squiggles?',
+            type: 'checkbox',
+            checked: self.interactiveOverlay,
+            onClick: () => {
+              self.setInteractiveOverlay(!self.interactiveOverlay)
+            },
+          },
+          {
+            label: 'Link views',
+            type: 'checkbox',
+            icon: LinkIcon,
+            checked: self.linkViews,
+            onClick: () => {
+              self.setLinkViews(!self.linkViews)
+            },
+          },
+          {
+            label: 'Export SVG',
+            icon: PhotoCamera,
+            onClick: () => {
+              getSession(self).queueDialog(handleClose => [
+                ExportSvgDialog,
+                {
+                  model: self,
+                  handleClose,
+                },
+              ])
+            },
+          },
+        ]
+      },
+
+      /**
+       * #method
+       */
+      rubberBandMenuItems() {
+        return [
+          {
+            label: 'Zoom to region(s)',
+            onClick: () => {
+              for (const view of self.views) {
+                const { leftOffset, rightOffset } = view
+                if (leftOffset && rightOffset) {
+                  view.moveTo(leftOffset, rightOffset)
+                }
+              }
+            },
+          },
+        ]
+      },
+    }))
+    .postProcessSnapshot(snap => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!snap) {
+        return snap
+      }
+      const {
+        init,
+        height,
+        trackSelectorType,
+        showIntraviewLinks,
+        linkViews,
+        interactiveOverlay,
+        showHeader,
+        ...rest
+      } = snap as Omit<typeof snap, symbol>
+      return {
+        ...rest,
+        ...(height !== 400 ? { height } : {}),
+        ...(trackSelectorType !== 'hierarchical' ? { trackSelectorType } : {}),
+        ...(!showIntraviewLinks ? { showIntraviewLinks } : {}),
+        ...(linkViews ? { linkViews } : {}),
+        ...(!interactiveOverlay ? { interactiveOverlay } : {}),
+        ...(showHeader ? { showHeader } : {}),
+      } as typeof snap
+    })
+}

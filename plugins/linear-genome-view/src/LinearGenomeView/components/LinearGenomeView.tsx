@@ -13,8 +13,12 @@ const ImportForm = lazy(() => import('./ImportForm.tsx'))
 const LinearGenomeView = observer(function LinearGenomeView({
   model,
 }: {
-  model: LinearGenomeViewModel
+  model: LinearGenomeViewModel & { lazyLoaded?: boolean }
 }) {
+  if (model.lazyLoaded === false) {
+    return <LoadingEllipses variant="h6" message="Loading" />
+  }
+
   const { showLoading, showImportForm, loadingMessage } = model
 
   if (showLoading) {
